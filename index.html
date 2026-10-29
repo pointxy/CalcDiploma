@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+    <meta charset="UTF-8">
+    <title>מערכת ציון עם חישוב מחושב וציון מקצוע לפי נוסחאות קיימות</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            direction: rtl;
+            font-family: sans-serif;
+            text-align: right;
+        }
+
+        table {
+            margin: 20px auto;
+            border-collapse: collapse;
+            width: 95%;
+            font-size: 14px;
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 6px;
+            text-align: right;
+            transition: background-color 0.2s ease;
+        }
+
+        th {
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+
+        tr:hover td {
+            background-color: #f5f5dc !important;
+        }
+
+        tr.active-row td {
+            background-color: #fffacd !important;
+        }
+
+        input[type="number"] {
+            width: 70px;
+        }
+        
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            opacity: 1;
+        }
+        
+        input[type="number"]:invalid {
+            border: 2px solid #ff0000;
+        }
+
+        .file-upload-wrapper {
+            margin: 20px;
+            padding: 15px;
+            background-color: #e3f2fd;
+            border: 1px solid #2196F3;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .file-upload-wrapper label {
+            font-weight: bold;
+            margin-left: 10px;
+            cursor: pointer;
+        }
+
+        .upload-button {
+            display: inline-block;
+            padding: 8px 16px;
+            background-color: #2196F3;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s ease;
+        }
+
+        .upload-button:hover {
+            background-color: #1976D2;
+        }
+
+        .upload-button::before {
+            content: '📁 ';
+            margin-left: 5px;
+        }
+
+        #upload {
+            display: none;
+        }
+
+        .controls-row {
+            margin: 20px;
+            padding: 15px;
+            background-color: #e3f2fd;
+            border: 1px solid #2196F3;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sheet-selector {
+            display: none;
+            align-items: center;
+        }
+
+        .sheet-selector label {
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .sheet-selector select {
+            padding: 8px;
+            font-size: 14px;
+            margin: 0 10px;
+            border-radius: 4px;
+            border: 1px solid #2196F3;
+        }
+
+        #saveBtn {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s ease;
+        }
+
+        #saveBtn:hover {
+            background-color: #45a049;
+        }
+
+        #saveBtn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .calculated-cell {
+            background-color: #e8f4f8;
+        }
+
+        .updated-cell {
+            background-color: #ffeb3b;
+            transition: background-color 2s ease;
+        }
+
+        .info {
+            margin: 20px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .info-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .info-header:hover {
+            background-color: #f0f0f0;
+        }
+
+        .info-title {
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .toggle-icon {
+            font-size: 20px;
+            transition: transform 0.3s ease;
+        }
+
+        .toggle-icon.expanded {
+            transform: rotate(180deg);
+        }
+
+        .info-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .info-content.expanded {
+            max-height: 500px;
+            margin-top: 10px;
+        }
+
+        .info-cell {
+            text-align: center;
+        }
+
+        .info-icon {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            background-color: #2196F3;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 18px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: help;
+            position: relative;
+        }
+
+        .upload-info-icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            background-color: #2196F3;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: help;
+            position: relative;
+            margin-right: 5px;
+        }
+
+        .info-tooltip {
+            position: fixed;
+            background-color: #333;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            max-width: 300px;
+            z-index: 1000;
+            pointer-events: none;
+            white-space: pre-wrap;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .info-tooltip::before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            right: 20px;
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-bottom: 5px solid #333;
+        }
+
+        .loading {
+            margin: 20px;
+            padding: 15px;
+            background-color: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .error {
+            margin: 20px;
+            padding: 15px;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>טבלת ציונים עם חישוב מחושב וציון מקצוע לפי נוסחאות קיימות</h2>
+    
+    <div class="info">
+        <div class="info-header" onclick="toggleInstructions()">
+            <span class="info-title">📋 הוראות שימוש</span>
+            <span class="toggle-icon" id="toggleIcon">▼</span>
+        </div>
+        <div class="info-content" id="infoContent">
+            <ul>
+                <li>המערכת טוענת אוטומטית את הקובץ data.xlsx מהתיקייה של הדף</li>
+                <li>ניתן גם לטעון קובץ אקסל משלך עם העמודות: כיתה, אחוזים, אופן הערכה, סמל שאלון, מועד, מיקום הבחינה, ציון, מחושב, ציון מקצוע, מידע</li>
+                <li>אם הקובץ מכיל מספר גיליונות, בחר את הגיליון הרצוי מהרשימה הנפתחת</li>
+                <li>עדכן ערכי ציון (ערכים בין 0-100 בלבד) והמערכת תחשב אוטומטית את "מחושב" ו"ציון מקצוע"</li>
+                <li>עמודת "ציון מקצוע" תחושב <strong>רק בתאים שיש בהם נוסחה מקורית</strong></li>
+                <li><strong>שינוי ציון בכל שורה יעדכן אוטומטית את כל שורות "ציון מקצוע" הרלוונטיות</strong></li>
+                <li>עמודת "מידע" תציג איקון מידע כאשר יש תוכן - העבר עכבר לצפייה</li>
+                <li>שורות יודגשו בעת מעבר עכבר או הזנת ציון</li>
+                <li>לחץ על כפתור "שמירה לאקסל" לשמירה של כל השינויים</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="loadingMessage" class="loading" style="display: none;">
+        טוען קובץ data.xlsx...
+    </div>
+
+    <div class="file-upload-wrapper">
+        <label for="upload" class="upload-button">בחר קובץ אקסל</label>
+        <input type="file" id="upload" accept=".xlsx,.xls" />
+        <span class="upload-info-icon" id="uploadInfoIcon">i</span>
+    </div>
+    
+    <div class="controls-row">
+        <div id="sheetSelector" class="sheet-selector">
+            <label for="sheetSelect">בחר גיליון:</label>
+            <select id="sheetSelect"></select>
+        </div>
+        <button id="saveBtn">💾 שמירה לאקסל</button>
+    </div>
+    
+    <div id="out"></div>
+
+    <script>
+        let wb, ws, rows, headers, colMap = {};
+        let currentTooltip = null;
+        let activeRow = null;
+        let formulaDependencies = {};
+        let currentSheetName = null;
+
+        function toggleInstructions() {
+            const content = document.getElementById('infoContent');
+            const icon = document.getElementById('toggleIcon');
+            
+            if (content.classList.contains('expanded')) {
+                content.classList.remove('expanded');
+                icon.classList.remove('expanded');
+            } else {
+                content.classList.add('expanded');
+                icon.classList.add('expanded');
+            }
+        }
+
+        // הוספת tooltip לאיקון המידע ליד כפתור בחר קובץ
+        const uploadInfoIcon = document.getElementById('uploadInfoIcon');
+        const uploadInfoText = 'באפשרותך לטעון בעזרת כפתור זה קובץ קודם שעבדת עליו באתר והורדת שמירה שלו.\n\nברירת המחדל היא לטעון את הקובץ מהשרת - קובץ זה ריק וללא פרטי משתמש.';
+        
+        uploadInfoIcon.addEventListener('mouseenter', (e) => showTooltip(e, uploadInfoText));
+        uploadInfoIcon.addEventListener('mouseleave', hideTooltip);
+        uploadInfoIcon.addEventListener('mousemove', (e) => updateTooltipPosition(e));
+
+        // טעינה אוטומטית של הקובץ בהפעלה
+        window.addEventListener('load', async () => {
+            try {
+                document.getElementById('loadingMessage').style.display = 'block';
+                // חיפוש הקובץ באותה תיקייה, ואם לא נמצא - בתיקיית data
+                let response = null;
+                for (const path of ['data.xlsx', 'data/data.xlsx']) {
+                    try {
+                        const r = await fetch(path, { cache: 'no-store' });
+                        if (r.ok) { response = r; break; }
+                    } catch (e) { /* ננסה את הנתיב הבא */ }
+                }
+
+                if (!response) {
+                    throw new Error('לא ניתן לטעון את הקובץ data.xlsx');
+                }
+
+                const data = await response.arrayBuffer();
+                loadExcelData(data);
+                document.getElementById('loadingMessage').style.display = 'none';
+            } catch (error) {
+                console.error('שגיאה בטעינת הקובץ:', error);
+                document.getElementById('loadingMessage').innerHTML = 
+                    '<div class="error">⚠️ לא ניתן לטעון את הקובץ data.xlsx. אנא טען קובץ באופן ידני.</div>';
+            }
+        });
+
+        document.getElementById('upload').addEventListener('change', async e => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const data = await file.arrayBuffer();
+            loadExcelData(data);
+            // הסתרת הודעת השגיאה לאחר טעינה ידנית מוצלחת
+            document.getElementById('loadingMessage').style.display = 'none';
+        });
+
+        function loadExcelData(data) {
+            wb = XLSX.read(data, { type: 'array' });
+            
+            const sheetSelector = document.getElementById('sheetSelector');
+            const sheetSelect = document.getElementById('sheetSelect');
+            sheetSelect.innerHTML = '';
+            
+            wb.SheetNames.forEach((name, index) => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                sheetSelect.appendChild(option);
+            });
+            
+            if (wb.SheetNames.length > 1) {
+                sheetSelector.style.display = 'flex';
+            }
+            
+            sheetSelect.onchange = (e) => {
+                loadSheet(e.target.value);
+            };
+            
+            loadSheet(wb.SheetNames[0]);
+        }
+
+        function loadSheet(sheetName) {
+            currentSheetName = sheetName;
+            ws = wb.Sheets[sheetName];
+            rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+            headers = rows[0];
+            colMap = {};
+            headers.forEach((h, i) => colMap[h] = i);
+
+            if (!('ציון' in colMap) || !('מחושב' in colMap) || !('ציון מקצוע' in colMap)) {
+                document.getElementById('out').innerHTML = "<p style='color:red;'>הקובץ חייב לכלול עמודות בשם 'ציון', 'מחושב' ו'ציון מקצוע'</p>";
+                document.getElementById('saveBtn').disabled = true;
+                return;
+            }
+
+            if (!('מידע' in colMap)) {
+                headers.push('מידע');
+                colMap['מידע'] = headers.length - 1;
+                rows.forEach((row, idx) => {
+                    if (idx > 0 && row) {
+                        if (!row[colMap['מידע']]) {
+                            row[colMap['מידע']] = '';
+                        }
+                    }
+                });
+            }
+
+            buildDependencyMap();
+            renderTable();
+            document.getElementById('saveBtn').disabled = false;
+        }
+
+        function buildDependencyMap() {
+            formulaDependencies = {};
+            const subjectCol = colMap['ציון מקצוע'];
+
+            for (let r = 1; r < rows.length; r++) {
+                const cellAddr = XLSX.utils.encode_cell({ r: r, c: subjectCol });
+                const cell = ws[cellAddr];
+
+                if (cell && cell.f) {
+                    const formula = cell.f;
+                    const cellRefs = formula.match(/([A-Z]+)(\d+)/g);
+
+                    if (cellRefs) {
+                        cellRefs.forEach(ref => {
+                            const match = ref.match(/([A-Z]+)(\d+)/);
+                            if (match) {
+                                const refRow = parseInt(match[2]) - 1;
+                                
+                                if (!formulaDependencies[refRow]) {
+                                    formulaDependencies[refRow] = [];
+                                }
+                                if (!formulaDependencies[refRow].includes(r)) {
+                                    formulaDependencies[refRow].push(r);
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+        }
+
+        function renderTable() {
+            const table = document.createElement('table');
+            const thead = document.createElement('tr');
+            headers.forEach(h => {
+                const th = document.createElement('th');
+                th.textContent = h;
+                thead.appendChild(th);
+            });
+            table.appendChild(thead);
+
+            for (let r = 1; r < rows.length; r++) {
+                const row = rows[r];
+                if (!row || row.every(cell => cell === undefined || cell === "")) continue;
+
+                const tr = document.createElement('tr');
+                tr.dataset.rowIndex = r;
+
+                tr.addEventListener('mouseenter', () => highlightRow(tr));
+                tr.addEventListener('mouseleave', () => unhighlightRow(tr));
+
+                headers.forEach((h, c) => {
+                    const td = document.createElement('td');
+                    const val = row[c] || "";
+
+                    if (h === 'ציון') {
+                        const input = document.createElement('input');
+                        input.type = 'number';
+                        input.min = '0';
+                        input.max = '100';
+                        input.step = '0.01';
+                        input.value = val;
+                        
+                        input.onfocus = () => setActiveRow(tr);
+                        input.onblur = () => clearActiveRow(tr);
+                        
+                        input.oninput = () => {
+                            let newVal = parseFloat(input.value);
+                            
+                            if (isNaN(newVal)) {
+                                newVal = 0;
+                            } else if (newVal < 0) {
+                                newVal = 0;
+                                input.value = 0;
+                            } else if (newVal > 100) {
+                                newVal = 100;
+                                input.value = 100;
+                            }
+                            
+                            rows[r][c] = newVal;
+                            const cellAddr = XLSX.utils.encode_cell({ r: r, c: c });
+                            ws[cellAddr] = { t: 'n', v: newVal };
+                            
+                            updateCalculatedColumns(r);
+                            updateDependentRows(r);
+                        };
+                        
+                        input.onblur = (e) => {
+                            let val = parseFloat(input.value);
+                            if (isNaN(val) || val < 0) {
+                                input.value = 0;
+                            } else if (val > 100) {
+                                input.value = 100;
+                            }
+                            input.dispatchEvent(new Event('input'));
+                            
+                            setTimeout(() => clearActiveRow(tr), 100);
+                        };
+                        
+                        td.appendChild(input);
+                    } else if (h === 'מחושב') {
+                        td.className = 'calculated-cell';
+                        td.id = `calc-${r}`;
+                        const calc = computeMehusbav(r);
+                        td.textContent = calc.toFixed(2);
+                        updateSheetMehusbav(r, calc);
+                    } else if (h === 'ציון מקצוע') {
+                        const subjectCol = colMap['ציון מקצוע'];
+                        const cellAddr = XLSX.utils.encode_cell({ r: r, c: subjectCol });
+                        const originalCell = ws[cellAddr];
+
+                        if (originalCell && originalCell.f) {
+                            td.className = 'calculated-cell';
+                            td.id = `subject-${r}`;
+                            const subjectGrade = computeSubjectGrade(r);
+                            td.textContent = subjectGrade.toFixed(2);
+                            updateSheetSubjectGrade(r, subjectGrade);
+                        } else {
+                            td.textContent = val;
+                        }
+                    } else if (h === 'מידע') {
+                        td.className = 'info-cell';
+                        if (val && val.toString().trim() !== '') {
+                            const infoIcon = document.createElement('span');
+                            infoIcon.className = 'info-icon';
+                            infoIcon.textContent = 'i';
+                            infoIcon.dataset.info = val;
+                            
+                            infoIcon.addEventListener('mouseenter', (e) => showTooltip(e, val));
+                            infoIcon.addEventListener('mouseleave', hideTooltip);
+                            infoIcon.addEventListener('mousemove', (e) => updateTooltipPosition(e));
+                            
+                            td.appendChild(infoIcon);
+                        } else {
+                            td.textContent = '';
+                        }
+                    } else if (h === 'אחוזים') {
+                        if (val !== "" && val !== undefined && val !== null) {
+                            const percentValue = parseFloat(val);
+                            if (!isNaN(percentValue)) {
+                                if (percentValue > 0 && percentValue <= 1) {
+                                    td.textContent = (percentValue * 100).toFixed(0) + '%';
+                                } else if (percentValue > 1) {
+                                    td.textContent = percentValue.toFixed(0) + '%';
+                                } else {
+                                    td.textContent = val;
+                                }
+                            } else {
+                                td.textContent = val;
+                            }
+                        } else {
+                            td.textContent = val;
+                        }
+                    } else {
+                        td.textContent = val;
+                    }
+
+                    tr.appendChild(td);
+                });
+                table.appendChild(tr);
+            }
+
+            document.getElementById('out').innerHTML = '';
+            document.getElementById('out').appendChild(table);
+        }
+
+        function updateDependentRows(changedRow) {
+            if (formulaDependencies[changedRow]) {
+                formulaDependencies[changedRow].forEach(dependentRow => {
+                    updateCalculatedColumns(dependentRow);
+                });
+            }
+        }
+
+        function highlightRow(tr) {
+            if (activeRow !== tr) {
+                tr.style.backgroundColor = '#f5f5dc';
+            }
+        }
+
+        function unhighlightRow(tr) {
+            if (activeRow !== tr) {
+                tr.style.backgroundColor = '';
+            }
+        }
+
+        function setActiveRow(tr) {
+            if (activeRow) {
+                activeRow.classList.remove('active-row');
+            }
+            activeRow = tr;
+            tr.classList.add('active-row');
+        }
+
+        function clearActiveRow(tr) {
+            if (activeRow === tr) {
+                activeRow.classList.remove('active-row');
+                activeRow = null;
+            }
+        }
+
+        function showTooltip(event, text) {
+            hideTooltip();
+            
+            const tooltip = document.createElement('div');
+            tooltip.className = 'info-tooltip';
+            tooltip.textContent = text;
+            document.body.appendChild(tooltip);
+            
+            currentTooltip = tooltip;
+            updateTooltipPosition(event);
+        }
+
+        function updateTooltipPosition(event) {
+            if (currentTooltip) {
+                const x = event.clientX;
+                const y = event.clientY;
+                
+                currentTooltip.style.left = x + 'px';
+                currentTooltip.style.top = (y + 20) + 'px';
+            }
+        }
+
+        function hideTooltip() {
+            if (currentTooltip) {
+                currentTooltip.remove();
+                currentTooltip = null;
+            }
+        }
+
+        function computeMehusbav(r) {
+            const grade = parseFloat(rows[r][colMap['ציון']] || 0);
+            let factor = parseFloat(rows[r][colMap['אחוזים']] || 0);
+            
+            if (factor > 1) {
+                factor = factor / 100;
+            }
+            
+            return grade * factor;
+        }
+
+        function computeSubjectGrade(r) {
+            const subjectCol = colMap['ציון מקצוע'];
+            const cellAddr = XLSX.utils.encode_cell({ r: r, c: subjectCol });
+            const originalCell = ws[cellAddr];
+
+            if (originalCell && originalCell.f) {
+                try {
+                    return evaluateFormula(originalCell.f, r);
+                } catch (e) {
+                    console.error('שגיאה בחישוב נוסחת ציון מקצוע:', e);
+                    return originalCell.v || 0;
+                }
+            } else {
+                return originalCell ? (originalCell.v || 0) : 0;
+            }
+        }
+
+        function evaluateFormula(formula, rowIndex) {
+            let cleanFormula = formula.replace(/^=/, '');
+
+            cleanFormula = cleanFormula.replace(/([A-Z]+)(\d+)/g, (match, col, row) => {
+                const colIndex = XLSX.utils.decode_col(col);
+                const actualRow = parseInt(row) - 1;
+
+                if (actualRow >= 0 && actualRow < rows.length && colIndex >= 0 && colIndex < headers.length) {
+                    const value = rows[actualRow][colIndex];
+                    const numValue = parseFloat(value);
+                    return isNaN(numValue) ? 0 : numValue;
+                }
+                return 0;
+            });
+
+            try {
+                cleanFormula = cleanFormula.replace(/IF\s*\(\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^)]+)\s*\)/gi, 
+                    (match, condition, trueVal, falseVal) => {
+                        return `((${condition}) ? (${trueVal}) : (${falseVal}))`;
+                    });
+
+                const result = Function('"use strict"; return (' + cleanFormula + ')')();
+                return isNaN(result) ? 0 : result;
+            } catch (e) {
+                console.error('שגיאה בהערכת נוסחה:', cleanFormula, e);
+                return 0;
+            }
+        }
+
+        function updateCalculatedColumns(r) {
+            const oldMehusbavVal = parseFloat(rows[r][colMap['מחושב']] || 0);
+
+            const mehusbavVal = computeMehusbav(r);
+            const mehusbavTd = document.getElementById(`calc-${r}`);
+            if (mehusbavTd) mehusbavTd.textContent = mehusbavVal.toFixed(2);
+            updateSheetMehusbav(r, mehusbavVal);
+
+            rows[r][colMap['מחושב']] = mehusbavVal;
+
+            const hasChanged = Math.abs(oldMehusbavVal - mehusbavVal) > 0.001;
+
+            const subjectCol = colMap['ציון מקצוע'];
+            const subjectCellAddr = XLSX.utils.encode_cell({ r: r, c: subjectCol });
+            const originalSubjectCell = ws[subjectCellAddr];
+
+            if (originalSubjectCell && originalSubjectCell.f) {
+                const subjectVal = computeSubjectGrade(r);
+                const subjectTd = document.getElementById(`subject-${r}`);
+                if (subjectTd) {
+                    subjectTd.textContent = subjectVal.toFixed(2);
+
+                    if (hasChanged) {
+                        highlightUpdatedCell(subjectTd);
+                    }
+                }
+                updateSheetSubjectGrade(r, subjectVal);
+            }
+        }
+
+        function highlightUpdatedCell(cellElement) {
+            cellElement.classList.add('updated-cell');
+
+            setTimeout(() => {
+                cellElement.classList.remove('updated-cell');
+            }, 3000);
+        }
+
+        function updateSheetMehusbav(r, val) {
+            const calcCol = colMap['מחושב'];
+            const gradeCol = colMap['ציון'];
+            const factorCol = colMap['אחוזים'];
+            const addr = XLSX.utils.encode_cell({ r, c: calcCol });
+            const gradeCell = XLSX.utils.encode_col(gradeCol) + (r + 1);
+            const factorCell = XLSX.utils.encode_col(factorCol) + (r + 1);
+            const formula = `${gradeCell}*${factorCell}`;
+            ws[addr] = { t: 'n', v: val, f: formula };
+        }
+
+        function updateSheetSubjectGrade(r, val) {
+            const subjectCol = colMap['ציון מקצוע'];
+            const addr = XLSX.utils.encode_cell({ r, c: subjectCol });
+
+            const originalCell = ws[addr];
+
+            if (originalCell && originalCell.f) {
+                ws[addr] = { t: 'n', v: val, f: originalCell.f };
+            }
+        }
+
+        document.getElementById('saveBtn').addEventListener('click', () => {
+            if (!wb) {
+                alert('אנא טען קובץ אקסל תחילה');
+                return;
+            }
+            
+            for (let r = 1; r < rows.length; r++) {
+                const row = rows[r];
+                if (!row || row.every(cell => cell === undefined || cell === "")) continue;
+                
+                const mehusbavVal = computeMehusbav(r);
+                updateSheetMehusbav(r, mehusbavVal);
+                
+                const subjectCol = colMap['ציון מקצוע'];
+                const cellAddr = XLSX.utils.encode_cell({ r: r, c: subjectCol });
+                const originalCell = ws[cellAddr];
+                
+                if (originalCell && originalCell.f) {
+                    const subjectVal = computeSubjectGrade(r);
+                    updateSheetSubjectGrade(r, subjectVal);
+                }
+            }
+            
+            const filename = currentSheetName ? `updated_${currentSheetName}.xlsx` : 'updated_scores.xlsx';
+            XLSX.writeFile(wb, filename);
+        });
+    </script>
+
+</body>
+</html>
